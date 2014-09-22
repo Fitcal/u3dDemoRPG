@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 
-
+namespace ChuMeng {
 public enum CharacterState {
 	Idle,
 	Running,
@@ -10,9 +10,9 @@ public enum CharacterState {
 
 [RequireComponent(typeof(CharacterController))]
 public class PlayerMoveController : MonoBehaviour {
+	public VirtualJoystickRegion VJR;
+
 	CharacterState _characterState;
-
-
 	Vector3 moveDirection;
 	float moveSpeed = 0;
 	float verticalSpeed = 0;
@@ -24,10 +24,11 @@ public class PlayerMoveController : MonoBehaviour {
 	float speedSmoothing = 10;
 	float gravity = 20.0f;
 
+	Vector3 camRight;
+	Vector3 camForward;
 
 
 	CollisionFlags collisionFlags;
-
 
 
 	void Awake() {
@@ -38,29 +39,56 @@ public class PlayerMoveController : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		animation.CrossFade("idle");
+		camRight = Camera.main.transform.TransformDirection(Vector3.right);
+		camForward = Camera.main.transform.TransformDirection(Vector3.forward);
+		camRight.y = 0;
+		camForward.y = 0;
+		camRight.Normalize();
+		camForward.Normalize();
 
 	}
 
 	void UpdateSmoothedMovementDirection() {
 		bool grounded = IsGrounded();
 
-		var forward = transform.TransformDirection(Vector3.forward);
-		forward.y = 0;
-		forward = forward.normalized;
-		Vector3 right = new Vector3(forward.z, 0, -forward.x);
+		//var forward = transform.TransformDirection(Vector3.forward);
+		//forward.y = 0;
+		//forward = forward.normalized;
+		//Vector3 right = new Vector3(forward.z, 0, -forward.x);
+
 
 		var v = Input.GetAxisRaw("Vertical");
 		var h = Input.GetAxisRaw("Horizontal");
+
+		//Camera direction
+		//Vector3 camRight = Camera.main.transform.TransformDirection(Vector3.right);
+		//Vector3 camForward = Camera.main.transform.TransformDirection(Vector3.up);
+
+
+		if(Mathf.Abs(v) < 0.1f && Mathf.Abs(h) < 0.1f &&  VJR != null)
+		{
+			Vector2 vec = VirtualJoystickRegion.VJRnormals;
+			//Camera direction f
+			Debug.Log("joyStick pos "+vec);
+
+			h = vec.x;
+			v = vec.y;
+		}
+
+		/*
 		if (v < -0.2)
 			movingBack = true;
 		else
             movingBack = false;
+		*/
 
 		bool wasMoving = isMoving;
 		isMoving = Mathf.Abs (h) > 0.1 || Mathf.Abs (v) > 0.1;
 
-		Vector3 targetDirection = h * right + v * forward;
-	
+		//Vector3 targetDirection = h * right + v * forward;
+
+		Vector3 targetDirection = h*camRight+v*camForward;
+
 
 		if (grounded)
 		{
@@ -71,13 +99,19 @@ public class PlayerMoveController : MonoBehaviour {
 			if (targetDirection != Vector3.zero)
 			{
 				// If we are really slow, just snap to the target direction
-				if (moveSpeed < walkSpeed * 0.9 && grounded)
+
+				if (moveSpeed < walkSpeed * 0.3f && grounded)
 				{
-					moveDirection = targetDirection.normalized;
+					//moveDirection = targetDirection.normalized;
+					moveDirection = Vector3.RotateTowards(moveDirection, targetDirection, rotateSpeed*2 * Mathf.Deg2Rad * Time.deltaTime, 1000);
+					
+					moveDirection = moveDirection.normalized;
 				}
 				// Otherwise smoothly turn towards it
 				else
 				{
+
+				
 					moveDirection = Vector3.RotateTowards(moveDirection, targetDirection, rotateSpeed * Mathf.Deg2Rad * Time.deltaTime, 1000);
 					
 					moveDirection = moveDirection.normalized;
@@ -86,11 +120,20 @@ public class PlayerMoveController : MonoBehaviour {
 			
 			// Smooth the speed based on the current target direction
 			var curSmooth = speedSmoothing * Time.deltaTime;
-			
+
+			//backward move first need to rotate then run
+			//if run first to stop then run
+
 			// Choose target speed
 			//* We want to support analog input but make sure you cant walk faster diagonally than just forward or sideways
+
 			var targetSpeed = Mathf.Min(targetDirection.magnitude, 1.0f);
+			if(Vector3.Dot(targetDirection, moveDirection) < 0) {
+				//targetSpeed = 0.1f;
+			}
+
 			targetSpeed *= walkSpeed;
+
 
             moveSpeed = Mathf.Lerp(moveSpeed, targetSpeed, curSmooth);
 			if(targetSpeed > 0.1f) 
@@ -145,6 +188,13 @@ public class PlayerMoveController : MonoBehaviour {
 
 			animation.CrossFade("run");
 		}
+
+		if (IsGrounded())
+		{
+			transform.rotation = Quaternion.LookRotation(moveDirection);	
+		}
 	}
+
+}
 
 }

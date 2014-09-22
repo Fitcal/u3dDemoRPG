@@ -10,7 +10,7 @@
 	}
 	
 	SubShader {
-		
+		/*
 		Pass {
 			Tags {"RenderType"="Opaque"}
 			CGPROGRAM
@@ -28,8 +28,10 @@
 			}
 			ENDCG
 		}
+		*/
 		
-		//UsePass "Custom/ambient"
+		UsePass "Custom/ambient/BASE"
+		
 		
 		Pass {
 			Tags {"RenderType"="Opaque"}
