@@ -19,7 +19,7 @@ public class PlayerMoveController : MonoBehaviour {
 	Vector3 inAirVelocity = Vector3.zero;
 	bool movingBack = false;
 	bool isMoving = false;
-	float walkSpeed = 2.0f;
+	float walkSpeed = 6.0f;
 	float rotateSpeed = 500;
 	float speedSmoothing = 10;
 	float gravity = 20.0f;
