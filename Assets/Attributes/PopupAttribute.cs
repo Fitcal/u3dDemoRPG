@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Linq;
 using System;
 
-
+namespace ChuMeng {
 //getPopList from target Object  GetOutPutTri
 public class PopupAttribute : PropertyAttribute {
 	public List<string> popList;
@@ -135,4 +135,5 @@ public class PopupDrawer : PropertyDrawer{
 			prop.stringValue = value;
 		}
 	}
+}
 }

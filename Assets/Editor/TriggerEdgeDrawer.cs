@@ -5,7 +5,7 @@ using System;
 using System.Reflection;
 using System.Linq;
 
-
+namespace ChuMeng {
 //[CustomPropertyDrawer(typeof(TriggerEdge))]
 public class TriggerEdgeDrawer : PropertyDrawer {
 
@@ -105,5 +105,7 @@ public class TriggerEdgeDrawer : PropertyDrawer {
 		}
 		return enm.Current;
 	}
+
+}
 
 }

@@ -3,7 +3,7 @@
 		_Color ("Main Color", Color) = (1,1,1,1)
 		_Ambient ("Ambient Color", Color) = (0.588, 0.588, 0.588, 1)
 		_MainTex ("Base (RGB)", 2D) = "white" {}
-		_LightDir ("World light Dir", Vector) = (1, 1, 1, 0)
+		_LightDir ("World light Dir", Vector) = (-1, -1, 1, 0)
 		
 		_ShadowColor ("Shadow Color", Color) = (0, 0, 0, 1)
 		
