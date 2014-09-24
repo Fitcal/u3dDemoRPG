@@ -11,11 +11,15 @@ namespace ChuMeng
 		Running,
 		Attacking,
 		Around,
+		Stunned,
 	};
 
 	[RequireComponent(typeof(CharacterController))]
+	[RequireComponent(typeof(MyAnimationEvent))]
 	public class PlayerMoveController : MonoBehaviour
 	{
+		public float AttackRange = 2;
+
 		public VirtualJoystickRegion VJR;
 		CharacterState _characterState;
 		Vector3 moveDirection;
@@ -37,8 +41,13 @@ namespace ChuMeng
 		int attackCount = 0;
 		List<string> allAttackAni;
 		int attackId = 0;
+
+		MyAnimationEvent animationEvent;
+
 		void Awake ()
 		{
+			animationEvent = GetComponent<MyAnimationEvent>();
+
 			allAttackAni = new List<string>(){"attack", "attack2"};
 
 			_characterState = CharacterState.Idle;
@@ -62,7 +71,7 @@ namespace ChuMeng
 
 		void OnAttack(GameObject g) {
 			Debug.Log("Attack animatin");
-
+			_characterState = CharacterState.Attacking;
 			if(!inAttack) {
 				StartAttack(allAttackAni[attackId]);
 				attackId++;
@@ -72,7 +81,6 @@ namespace ChuMeng
 				attackCount++;
 				attackCount = Mathf.Min(1, attackCount);
 			}
-			_characterState = CharacterState.Attacking;
 		}
 
 		void StartAttack(string name) {
@@ -82,8 +90,26 @@ namespace ChuMeng
 			StartCoroutine(WaitForAnimation(animation));
 		}
 
+		//Attack Around
+		void DoHit() {
+			GameObject[] ene = GameObject.FindGameObjectsWithTag("Enermy");
+			foreach(GameObject g in ene) {
+				float dist = (g.transform.position-transform.position).magnitude;
+				if(dist < AttackRange) {
+					g.GetComponent<MyAnimationEvent>().OnHit(gameObject);
+				}
+			}
+		}
+
+		/*
+		 * wait for attack over
+		 */
 		IEnumerator WaitForAnimation(Animation animation) {
 			do {
+				if(animationEvent.hit) {
+					animationEvent.hit = false;
+					DoHit();
+				}
 				yield return null;
 			}while(animation.isPlaying);
 			if(attackCount > 0) {
@@ -93,94 +119,64 @@ namespace ChuMeng
 				attackId %= allAttackAni.Count;
 			}else {
 				inAttack = false;
-				//_characterState = CharacterState.Idle;
+				_characterState = CharacterState.Idle;
 			}
 		}
 
 
 
 
+		/*
+		 * start Attack move speed goto zero
+		 */
 		void UpdateSmoothedMovementDirection ()
 		{
+			var v = Input.GetAxisRaw ("Vertical");
+			var h = Input.GetAxisRaw ("Horizontal");
+			
+			if (Mathf.Abs (v) < 0.1f && Mathf.Abs (h) < 0.1f && VJR != null) {
+				Vector2 vec = VirtualJoystickRegion.VJRnormals;
+				//Camera direction f
+				//Debug.Log ("joyStick pos " + vec);
+				
+				h = vec.x;
+				v = vec.y;
+			}
+			
+			bool wasMoving = isMoving;
+			isMoving = Mathf.Abs (h) > 0.1 || Mathf.Abs (v) > 0.1;
+			
+			Vector3 targetDirection = h * camRight + v * camForward;
+			bool grounded = IsGrounded ();
+			if (grounded) {
+				if (targetDirection != Vector3.zero) {
+					// If we are really slow, just snap to the target direction
+					
+					if (moveSpeed < walkSpeed * 0.3f && grounded) {
+						//moveDirection = targetDirection.normalized;
+						moveDirection = Vector3.RotateTowards (moveDirection, targetDirection, rotateSpeed * 2 * Mathf.Deg2Rad * Time.deltaTime, 1000);
+						
+						moveDirection = moveDirection.normalized;
+					}
+					// Otherwise smoothly turn towards it
+					else {
+						
+						
+						moveDirection = Vector3.RotateTowards (moveDirection, targetDirection, rotateSpeed * Mathf.Deg2Rad * Time.deltaTime, 1000);
+						
+						moveDirection = moveDirection.normalized;
+					}
+				}
+			}
+
 			var curSmooth = speedSmoothing * Time.deltaTime;
 			if(inAttack) {
 				moveSpeed = Mathf.Lerp (moveSpeed, 0, curSmooth);
 				return;
 			}
 
-			bool grounded = IsGrounded ();
-
-			//var forward = transform.TransformDirection(Vector3.forward);
-			//forward.y = 0;
-			//forward = forward.normalized;
-			//Vector3 right = new Vector3(forward.z, 0, -forward.x);
-
-
-			var v = Input.GetAxisRaw ("Vertical");
-			var h = Input.GetAxisRaw ("Horizontal");
-
-			//Camera direction
-			//Vector3 camRight = Camera.main.transform.TransformDirection(Vector3.right);
-			//Vector3 camForward = Camera.main.transform.TransformDirection(Vector3.up);
-
-
-			if (Mathf.Abs (v) < 0.1f && Mathf.Abs (h) < 0.1f && VJR != null) {
-				Vector2 vec = VirtualJoystickRegion.VJRnormals;
-				//Camera direction f
-				Debug.Log ("joyStick pos " + vec);
-
-				h = vec.x;
-				v = vec.y;
-			}
-
-			/*
-		if (v < -0.2)
-			movingBack = true;
-		else
-            movingBack = false;
-		*/
-
-			bool wasMoving = isMoving;
-			isMoving = Mathf.Abs (h) > 0.1 || Mathf.Abs (v) > 0.1;
-
-			//Vector3 targetDirection = h * right + v * forward;
-
-			Vector3 targetDirection = h * camRight + v * camForward;
-
 
 			if (grounded) {
-
-				// We store speed and direction seperately,
-				// so that when the character stands still we still have a valid forward direction
-				// moveDirection is always normalized, and we only update it if there is user input.
-				if (targetDirection != Vector3.zero) {
-					// If we are really slow, just snap to the target direction
-
-					if (moveSpeed < walkSpeed * 0.3f && grounded) {
-						//moveDirection = targetDirection.normalized;
-						moveDirection = Vector3.RotateTowards (moveDirection, targetDirection, rotateSpeed * 2 * Mathf.Deg2Rad * Time.deltaTime, 1000);
-					
-						moveDirection = moveDirection.normalized;
-					}
-				// Otherwise smoothly turn towards it
-				else {
-
-				
-						moveDirection = Vector3.RotateTowards (moveDirection, targetDirection, rotateSpeed * Mathf.Deg2Rad * Time.deltaTime, 1000);
-					
-						moveDirection = moveDirection.normalized;
-					}
-				}
-			
-				// Smooth the speed based on the current target direction
-
-
-				//backward move first need to rotate then run
-				//if run first to stop then run
-
-				// Choose target speed
-				//* We want to support analog input but make sure you cant walk faster diagonally than just forward or sideways
-
 				var targetSpeed = Mathf.Min (targetDirection.magnitude, 1.0f);
 				if (Vector3.Dot (targetDirection, moveDirection) < 0) {
 					//targetSpeed = 0.1f;

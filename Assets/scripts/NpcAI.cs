@@ -2,11 +2,19 @@
 using System.Collections;
 namespace ChuMeng {
 	[RequireComponent(typeof(CharacterController))]
+	[RequireComponent(typeof(MyAnimationEvent))]
+
 	public class NpcAI : MonoBehaviour {
 		CharacterState _characterState;
 
 		public float Radius = 5;
 		public float ApproachDistance = 4;
+
+		bool inStunned = false;
+
+
+		public float AttackRange = 1.0f;
+
 
 		public float WalkSpeed = 0.5f;
 		public float RunSpeed = 5;
@@ -15,6 +23,8 @@ namespace ChuMeng {
 
 		public float directionChangeInterval = 1;
 		public float maxHeadingChange = 30;
+		MyAnimationEvent myAnimationEvent;
+
 
 		CharacterController controller;
 		float heading;
@@ -26,7 +36,7 @@ namespace ChuMeng {
 
 		//inside birth circle
 		void Awake() {
-
+			myAnimationEvent = GetComponent<MyAnimationEvent>();
 			_characterState = CharacterState.Idle;
 
 			controller = GetComponent<CharacterController>();
@@ -34,6 +44,7 @@ namespace ChuMeng {
 			transform.eulerAngles = new Vector3(0, heading, 0);
 			StartCoroutine(NewHeading());
 			StartCoroutine(FindTarget());
+			//StartCoroutine(CheckOnHit());
 		}
 		// Use this for initialization
 		void Start () {
@@ -41,57 +52,141 @@ namespace ChuMeng {
 			birthPoint.y = 0;
 		}
 
+		IEnumerator WaitForAnimation(Animation animation) {
+			do {
+				yield return null;
+			}while(animation.isPlaying);
+		}
+
+		void OnControllerColliderHit(ControllerColliderHit hit) {
+			Debug.Log("hit gameobject "+hit.gameObject);
+		}
+
+		//swallow onHit
+		bool CheckOnHit() {
+			if(myAnimationEvent.onHit) {
+				myAnimationEvent.onHit = false;
+				return true;
+			}
+			return false;
+		}
+
+
+		IEnumerator Stunned() {
+			Debug.Log("Stunned");
+            if(inStunned) {
+				animation.Rewind("stunned");
+			}else {
+				_characterState = CharacterState.Stunned;
+
+				animation.Play("stunned");
+				animation["stunned"].wrapMode = WrapMode.Once;
+				animation["stunned"].speed = 2;
+				inStunned = true;
+				
+				yield return StartCoroutine(WaitForAnimation(animation));
+				_characterState = CharacterState.Idle;
+				inStunned = false;
+			}
+			yield return null;
+		}
+
+
+
 		IEnumerator AroundMoveAttack(){
 			_characterState = CharacterState.Around;
 
 
 			targetPlayer = GameObject.FindGameObjectWithTag("Player");
-			float passTime = 0;
-			animation.CrossFade("run");
-			animation["run"].speed = 2f;
-			animation["run"].wrapMode = WrapMode.Loop;
 
 			while(true) {
-				Vector3 dir = targetPlayer.transform.position-transform.position;
-				dir.y = 0;
-				var rotation = Quaternion.LookRotation(dir);
+				if(CheckOnHit()) {
+					yield return StartCoroutine(Stunned());
+					yield break;
+				}
 
-				transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Mathf.Min(1, Time.deltaTime*FastRotateSpeed));
-				//yield return null;
-				break;
-			}
-			yield return null;
-			var waitTime = Random.Range(1, 1.5f);
+				float passTime = 0;
+				animation.CrossFade("run");
+				animation["run"].speed = 2f;
+				animation["run"].wrapMode = WrapMode.Loop;
 
-			while(passTime < waitTime) {
-				Vector3 dir = targetPlayer.transform.position-transform.position;
-				dir.y = 0;
-				var rotation = Quaternion.LookRotation(dir);
-				transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime*FastRotateSpeed);
+				while(true) {
+					Vector3 dir = targetPlayer.transform.position-transform.position;
+					dir.y = 0;
+					var rotation = Quaternion.LookRotation(dir);
 
-
-				var right = transform.TransformDirection(Vector3.right);
-				controller.SimpleMove(right*WalkSpeed);
-
-
-
-				passTime += Time.deltaTime;
+					transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Mathf.Min(1, Time.deltaTime*FastRotateSpeed));
+					//yield return null;
+					break;
+				}
 				yield return null;
+				var waitTime = Random.Range(1, 1.5f);
+
+				while(passTime < waitTime) {
+					if(CheckOnHit()) {
+						Debug.Log("try to move around onhit");
+						StartCoroutine(Stunned());
+						yield break;
+					}
+
+
+					Vector3 dir = targetPlayer.transform.position-transform.position;
+					dir.y = 0;
+					var rotation = Quaternion.LookRotation(dir);
+					transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime*FastRotateSpeed);
+
+
+					var right = transform.TransformDirection(Vector3.right);
+					var back = transform.TransformDirection(Vector3.back);
+					if(dir.magnitude > AttackRange*1.2f) {
+						back = Vector3.zero;
+                    }
+
+					controller.SimpleMove(right*WalkSpeed+back*WalkSpeed);
+
+					passTime += Time.deltaTime;
+					yield return null;
+				}
+
+				//Rush to Player Follow
+				while(true) {
+					if(CheckOnHit()) {
+						StartCoroutine(Stunned());
+                        yield break;
+                    }
+
+					Vector3 dir = targetPlayer.transform.position-transform.position;
+					dir.y = 0;
+					if(dir.magnitude < AttackRange) {
+						break;
+					}
+
+					var rotation = Quaternion.LookRotation(dir);
+
+
+					transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime*FastRotateSpeed);
+					var forward = transform.TransformDirection(Vector3.forward);
+
+					controller.SimpleMove(forward*RunSpeed);
+					yield return null;
+				}
+
+				animation.CrossFade("attack1");
+
+				while(animation.isPlaying) {
+					if(CheckOnHit()) {
+						StartCoroutine(Stunned());
+                        yield break;
+                    }
+
+					Vector3 dir = targetPlayer.transform.position-transform.position;
+					dir.y = 0;
+					var rotation = Quaternion.LookRotation(dir);
+					transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime*FastRotateSpeed);
+					yield return null;
+				}
+
 			}
-
-			//Rush to Player Follow
-			while(true) {
-				Vector3 dir = targetPlayer.transform.position-transform.position;
-				dir.y = 0;
-				var rotation = Quaternion.LookRotation(dir);
-
-				transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime*directionChangeInterval);
-				var forward = transform.TransformDirection(Vector3.forward);
-
-				controller.SimpleMove(forward*RunSpeed);
-				yield return null;
-			}
-
 
 			_characterState = CharacterState.Idle;
 		}
@@ -105,6 +200,10 @@ namespace ChuMeng {
 					if(distance < ApproachDistance) {
 						yield return StartCoroutine(AroundMoveAttack());
 						//_characterState = CharacterState.Around;
+					}
+				}else {
+					if(CheckOnHit()) {
+						StartCoroutine(Stunned());
 					}
 				}
 				yield return null;
@@ -169,6 +268,7 @@ namespace ChuMeng {
 			}
 		}
 
+
 		
 		// Update is called once per frame
 		void Update () {
@@ -188,5 +288,8 @@ namespace ChuMeng {
 				//animation.CrossFade("run");
 			}
 		}
+
+
+
 	}
 }

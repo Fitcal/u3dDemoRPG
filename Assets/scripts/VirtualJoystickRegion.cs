@@ -106,7 +106,7 @@ public class VirtualJoystickRegion : MonoBehaviour {
 						if (Input.GetTouch(fingerID).position.x > (Screen.width/3)+background.pixelInset.width
 						    || Input.GetTouch(fingerID).position.y > (Screen.height/3)+background.pixelInset.height) {ResetJoystick();}
 						//
-						Debug.Log("Joystick Axis:: "+VJRnormals); //<-- Delete this line | (X,Y), from -1.0 to +1.0 | Use this value "VJRnormals" in your scripts.
+						//Debug.Log("Joystick Axis:: "+VJRnormals); //<-- Delete this line | (X,Y), from -1.0 to +1.0 | Use this value "VJRnormals" in your scripts.
 					}
 				}
 			}
